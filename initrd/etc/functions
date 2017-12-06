@@ -17,8 +17,9 @@ recovery() {
 	# but recreate the directory so that new tools can use it.
 	rm -rf /tmp/secret
 	mkdir -p /tmp/secret
-	tpm extend -ix 4 -ic recovery
-
+	if [ "$CONFIG_TPM" != n ]; then
+		tpm extend -ix 4 -ic recovery
+	fi
 	echo >&2 "!!!!! Starting recovery shell"
 	sleep 1
 	exec /bin/ash
