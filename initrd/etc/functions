@@ -10,6 +10,13 @@ warn() {
 	echo >&2 "$*";
 }
 
+lock_chip() {
+	APM_CNT=0xb2
+	FIN_CODE=0xcb
+	echo "Finalizing chipset"
+	io386 -o b -b x $APM_CNT $FIN_CODE
+}
+
 recovery() {
 	echo >&2 "!!!!! $*"
 
@@ -19,11 +26,14 @@ recovery() {
 	mkdir -p /tmp/secret
 	tpm extend -ix 4 -ic recovery
 
+	if [ "$CONFIG_IO386" = y ]; then
+		lock_chip
+	fi
+
 	echo >&2 "!!!!! Starting recovery shell"
 	sleep 1
 	exec /bin/ash
 }
-
 
 pcrs() {
 	head -7 /sys/class/tpm/tpm0/pcrs
@@ -105,7 +115,6 @@ confirm_gpg_card()
 	gpg --card-status \
 	|| die "gpg card read failed"
 }
-
 
 check_tpm_counter()
 {

@@ -1,0 +1,46 @@
+#!/bin/sh
+. /etc/config
+. /etc/functions
+
+
+echo >&2 "!!!!! Please authenticate with OpenPGP card to prove you own this box..."
+
+confirm_gpg_card
+
+# Perform a signing-based challenge-response,
+# to authencate that the card plugged in holding
+# the key to sign the list of boot files.
+CR_NONCE="/tmp/secret/cr_nonce"
+CR_SIG="/tmp/secret/cr_nonce.sig"
+
+dd \
+	if=/dev/urandom \
+	of="$CR_NONCE" \
+	count=1 \
+	bs=20 \
+	2>/dev/null \
+|| die "Unable to generate 20 random bytes"
+
+for tries in 1 2 3; do
+	if gpg --digest-algo SHA256 \
+		--detach-sign \
+		-o "$CR_SIG" \
+		"$CR_NONCE" \
+		&& gpgv "$CR_SIG" "$CR_NONCE" \
+	; then
+		# Remove any temporary secret files that might be hanging around
+		# but recreate the directory so that new tools can use it.
+		rm -rf /tmp/secret
+		mkdir -p /tmp/secret
+		if [ "$CONFIG_TPM" = y ]; then
+			tpm extend -ix 4 -ic flashing
+		fi
+		echo >&2 "!!!!! Starting shell for ROM flashing"
+		sleep 1
+		exec /bin/ash
+	else
+		rm "$CR_SIG"
+	fi
+done
+
+die "Authentication failed! You are not allowed to program the flash."
